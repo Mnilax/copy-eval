@@ -1,0 +1,30 @@
+variants:
+  - id: "v1_direct"
+    label: "Direct CTA"
+    text: |
+      Stop losing customers to bad onboarding.
+      Our AI writes welcome sequences that convert 3x better.
+      Start your free trial → zero credit card, cancel anytime.
+
+  - id: "v2_story"
+    label: "Story-driven"
+    text: |
+      Last month, a SaaS founder replaced their 12-email welcome sequence
+      with a 4-email AI-generated flow. Churn dropped 34% in two weeks.
+      The tool they used? Ours. Same setup takes 15 minutes.
+      Try it free — your onboarding shouldn't be your weakest link.
+
+  - id: "v3_social_proof"
+    label: "Social proof"
+    text: |
+      2,847 teams switched to AI-generated onboarding emails this quarter.
+      Average result: +28% activation, -19% churn, 4x faster setup.
+      Join them — free plan available, no engineering required.
+
+  - id: "v4_contrarian"
+    label: "Contrarian hook"
+    text: |
+      Your welcome email isn't bad. It's invisible.
+      87% of SaaS welcome emails get opened and forgotten in under 3 seconds.
+      We trained a model on 50K high-converting sequences.
+      It writes emails that actually get clicked. Test it on your flow — free.
