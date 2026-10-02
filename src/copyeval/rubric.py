@@ -1,6 +1,7 @@
 """Evaluation rubric — criteria and weights."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 

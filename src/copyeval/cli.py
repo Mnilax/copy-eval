@@ -1,39 +1,50 @@
 """CLI entry point for copy evaluation."""
 
 from __future__ import annotations
+
 import json
 from pathlib import Path
+from typing import Annotated
 
 import typer
 import yaml
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
-from copyeval.models import Variant, EvalReport
-from copyeval.rubric import load_rubric, DEFAULT_RUBRIC
-from copyeval.pairwise import generate_pairs, compute_elo
+from copyeval.models import EvalReport, Variant
+from copyeval.pairwise import compute_elo, generate_pairs
+from copyeval.rubric import DEFAULT_RUBRIC, load_rubric
 
 app = typer.Typer(help="Marketing Copy Eval Harness — LLM-as-judge")
 console = Console()
 
 
 def _load_variants(path: Path) -> list[Variant]:
-    text = path.read_text()
-    if path.suffix in (".yaml", ".yml"):
-        data = yaml.safe_load(text)
-    else:
-        data = json.loads(text)
-    return [Variant(**v) for v in data["variants"]]
+    try:
+        text = path.read_text(encoding="utf-8")
+        if path.suffix.lower() in (".yaml", ".yml"):
+            data = yaml.safe_load(text)
+        else:
+            data = json.loads(text)
+        if not isinstance(data, dict) or not isinstance(data.get("variants"), list) or not data["variants"]:
+            raise ValueError("Expected a nonempty variants list")
+        variants = [Variant(**v) for v in data["variants"]]
+        if len({v.id for v in variants}) != len(variants):
+            raise ValueError("Variant IDs must be unique")
+        return variants
+    except (OSError, ValueError, TypeError, yaml.YAMLError) as e:
+        raise typer.BadParameter(str(e), param_hint="variants_file") from e
 
 
 @app.command()
 def score(
-    variants_file: Path = typer.Argument(help="YAML/JSON file with variants"),
-    rounds: int = typer.Option(1, "--rounds", "-n", help="Number of eval rounds (averaged)"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show prompts without API calls"),
+    variants_file: Annotated[Path, typer.Argument(help="YAML/JSON file with variants")],
+    rounds: Annotated[int, typer.Option("--rounds", "-n", min=1, help="Number of eval rounds (averaged)")] = 1,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Show prompts without API calls")] = False,
 ):
     """Score each variant on the rubric criteria."""
-    from copyeval.judge import build_judge_prompt, parse_verdict
+    from copyeval.judge import average_verdicts, build_judge_prompt, parse_verdict
 
     variants = _load_variants(variants_file)
     rubric = load_rubric()
@@ -45,13 +56,12 @@ def score(
     for v in variants:
         system, user = build_judge_prompt(v, rubric)
         if dry_run:
-            console.print(f"\n[dim]--- {v.id} ---[/dim]\n{user[:200]}...")
+            console.print(Text(f"\n--- {v.id} ---\n{user[:200]}..."))
             continue
 
         from copyeval.client import call_judge
-        data = call_judge(system, user)
-        verdict = parse_verdict(v.id, data, rubric)
-        report.verdicts.append(verdict)
+        verdicts = [parse_verdict(v.id, call_judge(system, user), rubric) for _ in range(rounds)]
+        report.verdicts.append(average_verdicts(verdicts, rubric))
 
     if not dry_run and report.verdicts:
         _print_score_table(report)
@@ -59,8 +69,8 @@ def score(
 
 @app.command()
 def elo(
-    variants_file: Path = typer.Argument(help="YAML/JSON file with variants"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show prompts without API calls"),
+    variants_file: Annotated[Path, typer.Argument(help="YAML/JSON file with variants")],
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Show prompts without API calls")] = False,
 ):
     """Run pairwise comparisons and compute Elo ratings."""
     from copyeval.pairwise import build_pairwise_prompt, parse_pairwise
@@ -74,14 +84,14 @@ def elo(
     for a, b in pairs:
         system, user = build_pairwise_prompt(a, b)
         if dry_run:
-            console.print(f"  {a.id} vs {b.id}")
+            console.print(f"  {a.id} vs {b.id}", markup=False)
             continue
 
         from copyeval.client import call_judge
         data = call_judge(system, user)
         result = parse_pairwise(a.id, b.id, data)
         results.append(result)
-        console.print(f"  {a.id} vs {b.id} → winner: {result.winner_id}")
+        console.print(f"  {a.id} vs {b.id} → winner: {result.winner_id}", markup=False)
 
     if not dry_run and results:
         ratings = compute_elo(results, [v.id for v in variants])

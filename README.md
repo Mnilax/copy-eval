@@ -14,7 +14,7 @@ LLM-as-judge for marketing copy — score variants on a configurable rubric (cla
 - **Rubric scoring** — 5 criteria with weights, structured JSON output, averaged over N rounds
 - **Pairwise Elo** — all-pairs comparisons + Elo rating (more robust than single-shot scores)
 - **Rich reports** — terminal tables with per-criterion scores, rankings, and one-line verdicts
-- **Configurable** — custom criteria via rubric.py or YAML
+- **Configurable** — custom criteria via `rubric.py` or Python's `load_rubric` function
 
 ## Install
 
@@ -36,13 +36,15 @@ cp .env.example .env
 Create a YAML file with your copy variants (see `examples/variants.yaml`):
 
 ```yaml
-context: "Landing page hero for a B2B analytics product"
 variants:
-  - name: "A — Direct benefit"
+  - id: "A"
+    label: "Direct benefit"
     text: "Cut reporting time by 80%. One dashboard, every metric."
-  - name: "B — Story opener"
+  - id: "B"
+    label: "Story opener"
     text: "Last quarter, our team spent 200 hours on reports. Then we found a better way."
-  - name: "C — Question hook"
+  - id: "C"
+    label: "Question hook"
     text: "What if your entire team could access real-time metrics without a single spreadsheet?"
 ```
 
@@ -51,6 +53,9 @@ variants:
 ```bash
 # Rubric scoring — each variant scored on 5 criteria
 python -m copyeval.cli score examples/variants.yaml
+
+# Average three independent rounds (three API calls per variant)
+python -m copyeval.cli score examples/variants.yaml --rounds 3
 
 # Pairwise Elo — all-pairs head-to-head comparisons
 python -m copyeval.cli elo examples/variants.yaml
@@ -61,23 +66,23 @@ python -m copyeval.cli score examples/variants.yaml --dry-run
 
 ### Example Output
 
-The rubric scorer rates each variant on Clarity, Hook, CTA, Brand Fit, and Emotion (1-5 scale), then computes a weighted total. The Elo mode runs pairwise comparisons and produces a ranking:
+The rubric scorer rates each variant on Clarity, Hook, CTA, Brand Fit, and Emotion (0-10 scale), then computes a weighted total. The Elo mode uses a base rating of 1500 and K=32. The illustrative ranking below is not measured performance:
 
 ```
 Elo Ratings (after 6 pairwise comparisons)
 
   #   Variant                Elo    W-L
-  1   B — Story opener      1,068   3-0
-  2   A — Direct benefit    1,012   2-1
-  3   D — Social proof        988   1-2
-  4   C — Question hook        932   0-3
+  1   B — Story opener      1,568   3-0
+  2   A — Direct benefit    1,512   2-1
+  3   D — Social proof      1,488   1-2
+  4   C — Question hook     1,432   0-3
 ```
 
 ## How It Works
 
-1. **Rubric scoring** sends each variant + rubric criteria to Claude, requesting structured JSON with per-criterion scores (1-5) and reasoning. Scores are averaged over N rounds for stability.
+1. **Rubric scoring** sends each variant + rubric criteria to Claude, requesting structured JSON with per-criterion scores (0-10) and reasoning. Scores are averaged over N rounds; displayed reasoning and summary come from the final round.
 
-2. **Pairwise Elo** presents every pair of variants to the judge, asking "which is better and why?" Results feed into an Elo rating system (K=32, base 1000).
+2. **Pairwise Elo** presents every pair of variants to the judge, asking "which is better and why?" Results feed into an Elo rating system (K=32, base 1500). Results depend on comparison order; the CLI uses input order.
 
 3. Both modes produce **structured verdicts** — the LLM must return valid JSON with scores, reasoning, and a one-line verdict. This prevents vague "both are good" responses.
 
@@ -96,9 +101,18 @@ src/copyeval/
 ## Roadmap
 
 - [ ] Custom rubric via YAML config
-- [ ] Multi-round averaging with confidence intervals
+- [ ] Confidence intervals for multi-round scores
 - [ ] HTML report export
 - [ ] A/B test result integration
+
+## Testing
+
+```bash
+pip install -e ".[test]"
+python -m pytest
+```
+
+Tests use mocked judge responses and do not make paid API calls.
 
 ## License
 

@@ -1,7 +1,10 @@
 """Anthropic API client for eval calls."""
 
 from __future__ import annotations
-import os, json
+
+import json
+import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,10 +30,14 @@ def call_judge(system: str, user: str, temperature: float = 0.0) -> dict:
         system=system,
         messages=[{"role": "user", "content": user}],
     )
-    text = resp.content[0].text.strip()
+    text = "\n".join(block.text for block in resp.content if getattr(block, "type", None) == "text").strip()
+    if not text:
+        raise ValueError("Judge returned no text")
     # Extract JSON from potential markdown fences
     if text.startswith("```"):
         text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-    return json.loads(text)
+        text = text.removeprefix("json")
+    data = json.loads(text)
+    if not isinstance(data, dict):
+        raise TypeError("Judge must return a JSON object")
+    return data

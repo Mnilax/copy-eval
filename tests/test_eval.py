@@ -50,7 +50,7 @@ def test_compute_elo():
 
 
 def test_parse_verdict():
-    rubric = load_rubric()
+    rubric = [Criterion(name="clarity", description=""), Criterion(name="hook_strength", description="")]
     data = {
         "scores": [
             {"criterion": "clarity", "score": 8.0, "reasoning": "Clear"},

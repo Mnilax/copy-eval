@@ -1,9 +1,11 @@
 """Pairwise comparisons + Elo rating system."""
 
 from __future__ import annotations
+
 import math
 from itertools import combinations
-from copyeval.models import Variant, PairwiseResult, EloRating
+
+from copyeval.models import EloRating, PairwiseResult, Variant
 
 K_FACTOR = 32
 INITIAL_ELO = 1500.0
@@ -35,7 +37,12 @@ Which is better overall for marketing effectiveness?"""
 
 def parse_pairwise(a_id: str, b_id: str, data: dict) -> PairwiseResult:
     """Parse pairwise result JSON."""
-    winner = data["winner"].upper()
+    winner = data["winner"]
+    if not isinstance(winner, str) or winner.strip().upper() not in ("A", "B"):
+        raise ValueError("Judge winner must be A or B")
+    if a_id == b_id:
+        raise ValueError("Pairwise variants must have different IDs")
+    winner = winner.strip().upper()
     winner_id = a_id if winner == "A" else b_id
     loser_id = b_id if winner == "A" else a_id
 

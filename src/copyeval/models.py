@@ -1,13 +1,14 @@
 """Pydantic models for evaluation data."""
 
 from __future__ import annotations
+
 from pydantic import BaseModel, Field
 
 
 class Variant(BaseModel):
     """A copy variant to evaluate."""
-    id: str
-    text: str
+    id: str = Field(min_length=1)
+    text: str = Field(min_length=1)
     label: str = ""
 
 
