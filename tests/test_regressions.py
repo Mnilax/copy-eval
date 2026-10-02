@@ -68,9 +68,18 @@ def test_utf8_variants(tmp_path):
 
 def test_judge_uses_text_block_after_nontext_content(monkeypatch):
     response = SimpleNamespace(content=[SimpleNamespace(type="thinking"), SimpleNamespace(type="text", text='```json\n{"winner":"A"}\n```')])
-    client = SimpleNamespace(messages=SimpleNamespace(create=lambda **kw: response))
+    calls = []
+    def create(**kwargs):
+        calls.append(kwargs)
+        return response
+    client = SimpleNamespace(messages=SimpleNamespace(create=create))
     monkeypatch.setattr("copyeval.client.get_client", lambda: client)
+    monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
     assert call_judge("system", "user") == {"winner": "A"}
+    assert calls[-1]["model"] == "claude-sonnet-4-6"
+    monkeypatch.setenv("ANTHROPIC_MODEL", "configured-model")
+    call_judge("system", "user")
+    assert calls[-1]["model"] == "configured-model"
 
 
 def test_judge_rejects_non_object_json(monkeypatch):

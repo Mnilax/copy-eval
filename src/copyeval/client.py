@@ -21,7 +21,7 @@ def get_client():
 def call_judge(system: str, user: str, temperature: float = 0.0) -> dict:
     """Call the LLM and parse JSON response."""
     client = get_client()
-    model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+    model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 
     resp = client.messages.create(
         model=model,
